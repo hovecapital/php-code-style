@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 (2025-11-03)
+
+
+### Bug Fixes
+
+* setup release please, update claude md ([17b2543](https://github.com/hovecapital/php-code-style/commit/17b2543e936c652d89dae004a9220ba25941b208))
+
 ## [1.0.0] - Setup
 
 Initial release with release-please automation configured.
