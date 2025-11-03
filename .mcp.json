@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      }
+    },
+    "mysql": {
+      "command": "npx",
+      "args": ["-y", "@hovecapital/read-only-mysql-mcp-server"],
+      "env": {
+        "DB_HOST": "${DB_HOST:-localhost}",
+        "DB_PORT": "${DB_PORT:-3306}",
+        "DB_DATABASE": "${DB_DATABASE}",
+        "DB_USERNAME": "${DB_USERNAME}",
+        "DB_PASSWORD": "${DB_PASSWORD}"
+      }
+    }
+  }
+}

@@ -7,27 +7,15 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:ferrishall.dev)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "mcp__context7__resolve-library-id"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": []
   },
-  "mcpServers": {
-    "mysql": {
-      "description": "Read-only MySQL database inspection",
-      "repository": "hovecapital/read-only-local-mysql-mcp-server",
-      "required": true
-    },
-    "context7": {
-      "description": "Up-to-date library documentation",
-      "required": true
-    }
-  },
-  "requiredPlugins": {
-    "superpowers": {
-      "marketplace": "obra/superpowers-marketplace",
-      "description": "TDD, debugging, planning workflows"
-    }
+  "enableAllProjectMcpServers": true,
+  "enabledPlugins": {
+    "superpowers@obra/superpowers-marketplace": true
   }
 }
