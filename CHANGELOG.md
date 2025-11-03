@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/hovecapital/php-code-style/compare/v1.0.0...v1.0.1) (2025-11-03)
+
+
+### Bug Fixes
+
+* claude permissions local ([a585f06](https://github.com/hovecapital/php-code-style/commit/a585f06945a9d2f574099f0f0cc8d9ab3b5e886c))
+
 ## 1.0.0 (2025-11-03)
 
 
