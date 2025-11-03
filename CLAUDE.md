@@ -1,290 +1,403 @@
-# Laravel PHP + Vue 2 Development Guidelines
+# Laravel PHP + Vue 2 Development Guidelines v2
 
-## Core Principles
+## Environment & Workflow
 
-- Use concise language
-- No emojis
-- Code should be self-documenting with minimal inline comments
-- PHPDoc blocks required for classes and methods (IDE support)
-- Strict typing throughout
-- Test-driven development (flexible coverage goals)
-
-## Development Flow
-
-### 1. OpenSpec Workflow (Required for All Features)
-
-Every feature/bug fix starts with OpenSpec:
+**IMPORTANT: Use Sail for all Laravel commands**
 
 ```bash
-# Start new feature
-/openspec:proposal <feature-name>
-
-# Review and refine specs
-openspec show <feature-name>
-openspec validate <feature-name>
-
-# Implement
-/openspec:apply <feature-name>
-
-# Archive when complete
-/openspec:archive <feature-name> --yes
+./vendor/bin/sail artisan migrate
+./vendor/bin/sail composer require package/name
+./vendor/bin/sail artisan test
 ```
 
-### 2. Superpowers Integration
+**IMPORTANT: The user will run all npm commands - instruct and await**
 
-Superpowers skills activate automatically:
+**IMPORTANT: Sail and npm run dev will normally already be running**
 
-- **TDD**: test-driven-development skill for features
-- **Debugging**: systematic-debugging for issues
-- **Planning**: writing-plans and executing-plans for complex work
-- **Verification**: verification-before-completion before claiming done
+**IMPORTANT: We are running on a local development environment**
 
-Manual activation:
+**IMPORTANT: Use the MySQL MCP for inspecting the database**
 
-```bash
-/superpowers:brainstorm  # Design refinement
-/superpowers:write-plan  # Implementation planning
-/superpowers:execute-plan # Batch execution
+**IMPORTANT: Comments should be used very rarely, only when absolutely necessary - code should be self-documenting**
+
+**IMPORTANT: Use concise language**
+
+**IMPORTANT: Don't use emojis**
+
+## Architecture Overview
+
+### This Project's ACTUAL Architecture
+
+This codebase uses an **Actions + DTOs + ViewModels** pattern, NOT the traditional Service/Repository pattern.
+
+```
+Request → Form Request (validation)
+       → Controller (thin, delegates to Actions)
+       → DataTransferObject (structured data)
+       → Action(s) (single-purpose business logic)
+       → Events (side effects)
+       → Resource (API response) / ViewModel (Blade views)
 ```
 
-## Required MCP Servers
-
-### MySQL MCP
-
-Use for all database inspection:
-
-```json
-{
-  "name": "mysql",
-  "repository": "hovecapital/read-only-local-mysql-mcp-server",
-  "usage": "Query database schema, inspect data, analyze relationships"
-}
-```
-
-### Context7 MCP
-
-Use for library documentation:
-
-```json
-{
-  "name": "context7",
-  "usage": "Read up-to-date documentation for Laravel packages and dependencies"
-}
-```
-
-## Environment Notes
-
-- **Sail**: Use `./vendor/bin/sail` for all Laravel commands
-- **NPM**: User runs npm commands - instruct and await
-- **Dev servers**: Sail and `npm run dev` typically running
-- **Environment**: Local development
-
-## PHP/Laravel Backend
-
-### Type Safety
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Services;
-
-use App\Models\User;
-use App\DTOs\UserData;
-
-/**
- * User management service
- */
-final class UserService
-{
-    public function createUser(UserData $data): User
-    {
-        // Implementation
-    }
-
-    public function findById(int $id): ?User
-    {
-        // Implementation
-    }
-}
-```
-
-**Rules:**
-
-- `declare(strict_types=1)` at top of all PHP files
-- Parameter and return type hints on all methods
-- Avoid `mixed` type unless legacy compatibility required
-- Use `?Type` for nullable, handle null cases explicitly
-- Readonly properties where applicable (PHP 8.1+)
-
-### Modern PHP Features (8.3+)
-
-```php
-// Enums with backed values
-enum UserRole: string
-{
-    case ADMIN = 'admin';
-    case USER = 'user';
-}
-
-// Constructor property promotion
-final class UserData
-{
-    public function __construct(
-        public readonly string $email,
-        public readonly string $name,
-        public readonly UserRole $role,
-    ) {}
-}
-
-// Named arguments
-$user = new User(
-    email: 'user@example.com',
-    name: 'John Doe',
-    role: UserRole::USER,
-);
-
-// Match expressions
-$status = match ($user->role) {
-    UserRole::ADMIN => 'Administrator',
-    UserRole::USER => 'Regular User',
-};
-```
-
-### Code Quality
-
-- **No repetition**: Extract to services, traits, helpers
-- **Single responsibility**: One clear purpose per class/method
-- **Explicit returns**: Always return values, even void
-- **Fail early**: Validate inputs at method start with clear exceptions
-
-### Laravel Architecture
+### Current Project Structure
 
 ```
 app/
+├── Actions/                    # PRIMARY business logic layer (45 files)
+│   ├── Campaigns/
+│   ├── Products/              # SaveProductAccessories, SaveProductCategories, etc.
+│   ├── Users/
+│   └── SaveChangelogAction.php
+├── DataTransferObjects/        # NOT "DTOs/" - full name (20 files)
+│   ├── Product/
+│   ├── Campaigns/
+│   └── ChangelogDataTransferObject.php
+├── ViewModels/                 # Prepare data for Blade views (15 files)
+│   └── ProductsViewModel.php
 ├── Http/
-│   ├── Controllers/        # Thin controllers, delegate to services
-│   ├── Requests/          # Form request validation
-│   └── Resources/         # API response formatting
-├── Services/              # Business logic
-├── Repositories/          # Complex database queries
-├── DTOs/                  # Data Transfer Objects
-├── Enums/                 # Constants and status values
-└── Models/                # Eloquent models with typed relationships
+│   ├── Controllers/           # Thin controllers (98 files, some need refactoring)
+│   ├── Requests/              # Form validation (29 files) ✅
+│   └── Resources/             # API responses (53 files) ✅
+├── Models/                     # Eloquent models (74 files)
+├── Events/                     # Event-driven architecture ✅
+├── Listeners/                  # Event handlers ✅
+├── Jobs/                       # Queue jobs ✅
+├── Mail/                       # Mailable classes ✅
+├── Helpers/                    # Static utility methods (4 files)
+├── Traits/                     # Shared behaviors (5 files)
+├── Utilities/                  # Date, Revenue utilities (2 files)
+└── Services/                   # Only 1 file (UserAuditService) - NOT primary pattern
 ```
 
-### Controller Pattern
+**Note:** This project does NOT use:
+
+- Repositories (no app/Repositories/)
+- Services layer (only 1 service file exists)
+- PHP Enums (uses model constants instead)
+
+## PHP/Laravel Backend Standards
+
+### Type Safety: Current vs Aspirational
+
+**Current State (Reality Check):**
+
+- ~5% of files use `declare(strict_types=1)`
+- Type hints partially adopted
+- Many legacy files without strict typing
+
+**NEW CODE STANDARD (Required Going Forward):**
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Actions\Products;
 
-use App\Http\Requests\CreateUserRequest;
-use App\Http\Resources\UserResource;
-use App\Services\UserService;
-use Illuminate\Http\JsonResponse;
+use App\Models\Product;
+use App\DataTransferObjects\Product\ProductDataTransferObject;
 
 /**
- * User management controller
+ * Save product accessories
  */
-final class UserController extends Controller
+final class SaveProductAccessories
+{
+    public function __invoke(Product $product, ProductDataTransferObject $data): void
+    {
+        // Implementation with full type hints
+    }
+}
+```
+
+**Type Safety Rules for New Code:**
+
+- `declare(strict_types=1)` at top of ALL new PHP files
+- Parameter and return type hints on ALL methods
+- Avoid `mixed` type unless absolutely necessary
+- Use `?Type` for nullable, handle null cases explicitly
+- Use `readonly` properties where applicable (PHP 8.1+)
+
+**Legacy Code:**
+
+- Gradual improvement encouraged but not mandatory
+- When modifying existing files, add type hints opportunistically
+- No requirement to retrofit entire codebase
+
+### Modern PHP Features (PHP 8.1+)
+
+**Constructor Property Promotion (Currently used well in DTOs):**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\DataTransferObjects\Product;
+
+final class ProductDataTransferObject
 {
     public function __construct(
-        private readonly UserService $userService,
+        public string $title,
+        public string $slug,
+        public ?string $notes,
+        public int $categoryId,
+        public readonly bool $isActive,
+    ) {}
+}
+```
+
+**Model Constants (Current approach):**
+
+```php
+// Current: Using class constants
+class Product extends Model
+{
+    public const FELLOWSHIP = 5;
+    public const THIRD_PARTY = 2;
+}
+```
+
+**Future Consideration (PHP 8.1+ Enums):**
+
+```php
+// Could migrate to enums for better type safety
+enum ProductType: int
+{
+    case FELLOWSHIP = 5;
+    case THIRD_PARTY = 2;
+}
+```
+
+### Actions Pattern (PRIMARY Business Logic Layer)
+
+Actions are single-purpose, invokable classes. Use for discrete business operations.
+
+**When to create an Action:**
+
+- Saving related data (SaveProductAccessories)
+- Complex business operations (ProcessOrderAction)
+- Reusable operations called from multiple controllers
+- Operations that trigger events
+
+**Action Structure:**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Products;
+
+use App\Models\Product;
+use App\DataTransferObjects\Product\ProductDataTransferObject;
+use App\Events\ProductUpdated;
+
+final class SaveProductAccessories
+{
+    public function __invoke(Product $product, ProductDataTransferObject $data): void
+    {
+        $product->accessories()->sync($data->accessoryIds);
+
+        event(new ProductUpdated($product));
+    }
+}
+```
+
+**Examples from codebase:**
+
+- `app/Actions/Products/SaveProductVariants.php`
+- `app/Actions/Products/SaveProductBundles.php`
+- `app/Actions/SaveChangelogAction.php`
+
+### DataTransferObjects Pattern
+
+**Directory:** `app/DataTransferObjects/` (NOT `app/DTOs/`)
+
+Use DTOs to transform request data into structured, typed objects.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\DataTransferObjects\Product;
+
+use App\Http\Requests\Admin\Product\SaveProduct;
+
+final class ProductDataTransferObject
+{
+    public function __construct(
+        public string $title,
+        public string $slug,
+        public ?string $description,
+        public array $categoryIds,
+        public array $accessoryIds,
     ) {}
 
-    public function store(CreateUserRequest $request): JsonResponse
+    public static function fromSaveProductRequest(SaveProduct $request): self
     {
-        $user = $this->userService->createUser(
-            $request->validated()
+        return new self(
+            title: $request->input('title'),
+            slug: $request->input('slug'),
+            description: $request->input('description'),
+            categoryIds: $request->input('categories', []),
+            accessoryIds: $request->input('accessories', []),
         );
+    }
+}
+```
 
-        return UserResource::make($user)
+### ViewModels Pattern
+
+**Directory:** `app/ViewModels/`
+
+Use ViewModels to prepare data for Blade views (not API responses).
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\ViewModels;
+
+use App\Models\Product;
+use App\Models\Category;
+
+final class ProductsViewModel
+{
+    public readonly Collection $products;
+    public readonly Collection $categories;
+
+    public function __construct(?int $categoryId = null)
+    {
+        $this->products = Product::with('categories', 'points')
+            ->when($categoryId, fn($q) => $q->whereHas('categories', fn($q) => $q->where('id', $categoryId)))
+            ->get();
+
+        $this->categories = Category::all();
+    }
+}
+```
+
+**Usage in controller:**
+
+```php
+public function index(?int $categoryId = null)
+{
+    $viewModel = new ProductsViewModel($categoryId);
+    return view('products.index', ['viewModel' => $viewModel]);
+}
+```
+
+### Controllers: Thin by Design
+
+**Standard (Good):**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Requests\Admin\Product\SaveProduct;
+use App\Http\Resources\Admin\ProductResource;
+use App\DataTransferObjects\Product\ProductDataTransferObject;
+use App\Actions\Products\SaveProductAction;
+
+final class ProductsController extends Controller
+{
+    public function __construct(
+        private readonly SaveProductAction $saveProduct,
+    ) {}
+
+    public function store(SaveProduct $request): JsonResponse
+    {
+        $productData = ProductDataTransferObject::fromSaveProductRequest($request);
+
+        $product = ($this->saveProduct)($productData);
+
+        return ProductResource::make($product)
             ->response()
             ->setStatusCode(201);
     }
 }
 ```
 
-### Service Layer
+**WARNING: Some controllers are too large**
+
+- `app/Http/Controllers/Admin/ManualOrderController.php` - 1,776 lines (needs refactoring)
+- `app/Http/Controllers/Retail/WishlistController.php` - 415 lines
+- `app/Http/Controllers/Admin/SearchController.php` - 349 lines
+
+**Rule:** Controllers >200 lines should be refactored into multiple Actions.
+
+### Form Requests (Well Implemented ✅)
+
+**Directory:** `app/Http/Requests/` (29 files)
+
+Always use Form Requests for validation, not inline controller validation.
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Http\Requests\Admin\Product;
 
-use App\DTOs\UserData;
-use App\Models\User;
-use App\Repositories\UserRepository;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Http\FormRequest;
 
-/**
- * User management service
- */
-final class UserService
+final class SaveProduct extends FormRequest
 {
-    public function __construct(
-        private readonly UserRepository $userRepository,
-    ) {}
-
-    public function createUser(array $data): User
+    public function rules(): array
     {
-        $userData = new UserData(
-            email: $data['email'],
-            name: $data['name'],
-            role: UserRole::from($data['role']),
-        );
-
-        return $this->userRepository->create([
-            'email' => $userData->email,
-            'name' => $userData->name,
-            'role' => $userData->role->value,
-            'password' => Hash::make($data['password']),
-        ]);
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'slug' => ['required', 'string', 'unique:products,slug,' . $this->route('id')],
+            'categories' => ['array'],
+            'categories.*' => ['exists:categories,id'],
+        ];
     }
 }
 ```
 
-### Form Request Validation
+### API Resources (Well Implemented ✅)
+
+**Directory:** `app/Http/Resources/` (53 files)
+
+Use API Resources for consistent JSON response formatting.
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace App\Http\Requests;
+namespace App\Http\Resources\Admin;
 
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
-use App\Enums\UserRole;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Create user request validation
- */
-final class CreateUserRequest extends FormRequest
+final class ProductResource extends JsonResource
 {
-    /**
-     * @return array<string, mixed>
-     */
-    public function rules(): array
+    public function toArray($request): array
     {
         return [
-            'email' => ['required', 'email', 'unique:users'],
-            'name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8'],
-            'role' => ['required', new Enum(UserRole::class)],
+            'id' => $this->id,
+            'title' => $this->title,
+            'slug' => $this->slug,
+            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
+            'created_at' => $this->created_at?->toISOString(),
         ];
     }
 }
 ```
 
 ### Eloquent Models
+
+**Directory:** `app/Models/` (74 files)
+
+**Current state:** Most models lack strict types, but relationships have return types.
+
+**New model standard:**
 
 ```php
 <?php
@@ -294,46 +407,383 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Enums\UserRole;
 
 /**
- * User model
- * 
+ * Product model
+ *
  * @property int $id
- * @property string $email
- * @property string $name
- * @property UserRole $role
+ * @property string $title
+ * @property string $slug
  */
-final class User extends Model
+final class Product extends Model
 {
+    public const FELLOWSHIP = 5;
+    public const THIRD_PARTY = 2;
+
     protected $fillable = [
-        'email',
-        'name',
-        'role',
+        'title',
+        'slug',
+        'description',
     ];
 
-    /**
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'role' => UserRole::class,
-            'email_verified_at' => 'datetime',
+            'is_active' => 'boolean',
+            'published_at' => 'datetime',
         ];
     }
 
-    public function posts(): HasMany
+    public function categories(): BelongsToMany
     {
-        return $this->hasMany(Post::class);
+        return $this->belongsToMany(Category::class);
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class);
     }
 }
 ```
 
-### Testing Approach
+### Event-Driven Architecture (Well Implemented ✅)
 
-Focus on meaningful tests over coverage metrics:
+**Directories:** `app/Events/`, `app/Listeners/`, `app/Jobs/`
+
+Use events for side effects and decoupling.
+
+```php
+// In Action
+use App\Events\ProductCreated;
+
+public function __invoke(ProductDataTransferObject $data): Product
+{
+    $product = Product::create([...]);
+
+    event(new ProductCreated($product, auth()->user()->name));
+
+    return $product;
+}
+```
+
+### Code Quality Standards
+
+**For All Code:**
+
+- **No repetition**: Extract to Actions, Traits, Helpers
+- **Single responsibility**: One clear purpose per class/method
+- **Explicit returns**: Always return values, even void
+- **Fail early**: Validate inputs at method start with clear exceptions
+- **PHPDoc blocks**: Required for classes and public methods (IDE support)
+
+**Query Optimization:**
+
+```php
+// Bad: N+1 queries
+$users = User::all();
+foreach ($users as $user) {
+    echo $user->posts->count();
+}
+
+// Good: Eager loading
+$users = User::withCount('posts')->get();
+foreach ($users as $user) {
+    echo $user->posts_count;
+}
+```
+
+## Vue 2 Frontend Standards
+
+### Current Reality vs New Standards
+
+**CURRENT STATE (Existing Code):**
+
+- Component-local state (no Vuex store)
+- Inline axios calls in components
+- Minimal/missing prop validation
+- Components in `resources/js/admin/` and `resources/js/retail/`
+
+**NEW STANDARDS (For New Features):**
+
+- Create API service layer in `resources/js/services/`
+- Implement Vuex for shared state management
+- Require prop validation with types
+- Create `resources/js/constants/` for app constants
+
+**Migration Approach:**
+
+- New features MUST follow new standards
+- Refactor existing code opportunistically, not mandatorily
+
+### Component Design
+
+**Current (Acceptable for Existing Code):**
+
+```vue
+<template>
+  <div class="gallery">
+    <img :src="src" :alt="alt">
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'Gallery',
+  props: ['src', 'alt', 'single'],  // No validation
+}
+</script>
+```
+
+**NEW STANDARD (Required for New Components):**
+
+```vue
+<template>
+  <div class="product-card">
+    <h3>{{ product.title }}</h3>
+    <p>{{ product.description }}</p>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'ProductCard',
+
+  props: {
+    product: {
+      type: Object,
+      required: true,
+      validator: (product) => {
+        return product.id && product.title;
+      },
+    },
+  },
+
+  computed: {
+    displayPrice() {
+      return this.formatMoney(this.product.price);
+    },
+  },
+}
+</script>
+```
+
+**Component Rules:**
+
+- Single File Components (.vue)
+- PascalCase component names, kebab-case in templates
+- **New components:** MUST validate props with types and required flags
+- Single responsibility per component
+- Computed properties for derived state, not methods
+
+### Project Structure (Vue)
+
+**Current Structure:**
+
+```
+resources/js/
+├── admin/                      # Admin interface (98 components)
+│   ├── components/
+│   ├── pages/
+│   ├── mixins/                # Well-implemented (7 files) ✅
+│   │   ├── money.js
+│   │   ├── Format.js
+│   │   └── ...
+│   └── util/
+├── retail/                     # Customer-facing (100 components)
+│   ├── account/
+│   ├── cart/
+│   ├── product/
+│   └── wishlist/
+└── tracking/                   # Tracking functionality
+```
+
+**NEW STRUCTURE (Add These):**
+
+```
+resources/js/
+├── services/                   # NEW: API layer
+│   ├── productService.js
+│   ├── cartService.js
+│   └── axios.js
+├── store/                      # NEW: Vuex modules
+│   ├── modules/
+│   │   ├── products.js
+│   │   └── cart.js
+│   └── index.js
+├── constants/                  # NEW: App constants
+│   └── productTypes.js
+└── (existing directories)
+```
+
+### API Service Layer (NEW STANDARD)
+
+**Create:** `resources/js/services/productService.js`
+
+```javascript
+import axios from 'axios';
+
+class ProductService {
+  async getAll(categoryId = null) {
+    const params = categoryId ? { category: categoryId } : {};
+    const response = await axios.get('/api/products', { params });
+    return response.data.data;
+  }
+
+  async getById(id) {
+    const response = await axios.get(`/api/products/${id}`);
+    return response.data.data;
+  }
+
+  async create(productData) {
+    const response = await axios.post('/api/products', productData);
+    return response.data.data;
+  }
+
+  async update(id, productData) {
+    const response = await axios.patch(`/api/products/${id}`, productData);
+    return response.data.data;
+  }
+}
+
+export default new ProductService();
+```
+
+**Usage in component:**
+
+```javascript
+import productService from '@/services/productService';
+
+export default {
+  async mounted() {
+    try {
+      this.products = await productService.getAll(this.categoryId);
+    } catch (error) {
+      this.$toast.error('Failed to load products');
+    }
+  },
+}
+```
+
+### Vuex Store (NEW STANDARD for Shared State)
+
+**When to use Vuex:**
+
+- Shared state across multiple components
+- Complex state management needs
+- User authentication state
+- Shopping cart state
+
+**Create:** `resources/js/store/modules/products.js`
+
+```javascript
+import productService from '@/services/productService';
+
+export default {
+  namespaced: true,
+
+  state: {
+    products: [],
+    loading: false,
+    error: null,
+  },
+
+  mutations: {
+    SET_PRODUCTS(state, products) {
+      state.products = products;
+    },
+
+    SET_LOADING(state, loading) {
+      state.loading = loading;
+    },
+
+    SET_ERROR(state, error) {
+      state.error = error;
+    },
+  },
+
+  actions: {
+    async fetchProducts({ commit }, categoryId = null) {
+      commit('SET_LOADING', true);
+      commit('SET_ERROR', null);
+
+      try {
+        const products = await productService.getAll(categoryId);
+        commit('SET_PRODUCTS', products);
+      } catch (error) {
+        commit('SET_ERROR', error.message);
+      } finally {
+        commit('SET_LOADING', false);
+      }
+    },
+  },
+
+  getters: {
+    activeProducts: (state) => {
+      return state.products.filter(p => p.is_active);
+    },
+  },
+};
+```
+
+### Mixins (Well Implemented ✅)
+
+**Directory:** `resources/js/admin/mixins/` (7 files)
+
+Mixins are currently used well for shared functionality.
+
+```javascript
+// resources/js/admin/mixins/money.js
+export default {
+    methods: {
+        money(value) {
+            var formatter = new Intl.NumberFormat('en-GB', {
+                style: 'currency',
+                currency: 'GBP',
+            });
+            return formatter.format(value);
+        }
+    }
+}
+```
+
+**Continue using mixins for:**
+
+- Formatting utilities
+- Shared methods
+- Common computed properties
+
+## Testing Standards
+
+### Current State
+
+**Feature Tests:** 50 files (well-covered ✅)
+**Unit Tests:** 2 files (minimal coverage)
+
+```
+tests/
+├── Feature/
+│   ├── Admin/
+│   ├── WishlistTest.php
+│   ├── FavouritesTest.php
+│   ├── ThirdPartyApprovalTest.php
+│   └── ... (47 more)
+└── Unit/
+    ├── ExampleTest.php
+    └── OuBusinessSettingTest.php
+```
+
+### Testing Standards
+
+**Priorities:**
+
+1. Feature tests for API endpoints (continue current approach)
+2. Unit tests for complex Actions and business logic (increase coverage)
+3. Integration tests for external services
+4. **Test what matters, not lines of code**
+
+**Feature Test Example:**
 
 ```php
 <?php
@@ -344,166 +794,64 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\User;
-use App\Enums\UserRole;
+use App\Models\Product;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-final class UserManagementTest extends TestCase
+final class ProductManagementTest extends TestCase
 {
-    public function test_creates_user_with_valid_data(): void
+    use RefreshDatabase;
+
+    public function test_admin_can_create_product(): void
     {
-        $response = $this->postJson('/api/users', [
-            'email' => 'test@example.com',
-            'name' => 'Test User',
-            'password' => 'password123',
-            'role' => 'user',
-        ]);
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->actingAs($admin)
+            ->postJson('/api/admin/products', [
+                'title' => 'Test Product',
+                'slug' => 'test-product',
+                'description' => 'Test description',
+            ]);
 
         $response->assertCreated();
-        $this->assertDatabaseHas('users', [
-            'email' => 'test@example.com',
+        $this->assertDatabaseHas('products', [
+            'title' => 'Test Product',
         ]);
     }
 }
 ```
 
-**Testing priorities:**
+**Unit Test for Actions (NEW STANDARD):**
 
-- Feature tests for API endpoints
-- Unit tests for complex business logic
-- Integration tests for external services
-- Test what matters, not lines of code
+```php
+<?php
 
-## Vue 2 Frontend
+declare(strict_types=1);
 
-### Component Design
+namespace Tests\Unit\Actions;
 
-```vue
-<template>
-  <div class="user-profile">
-    <h2>{{ user.name }}</h2>
-    <p>{{ user.email }}</p>
-    <user-role-badge :role="user.role" />
-  </div>
-</template>
+use Tests\TestCase;
+use App\Actions\Products\SaveProductAccessories;
+use App\Models\Product;
+use App\Models\Accessory;
 
-<script>
-import UserRoleBadge from './UserRoleBadge.vue';
+final class SaveProductAccessoriesTest extends TestCase
+{
+    public function test_saves_product_accessories(): void
+    {
+        $product = Product::factory()->create();
+        $accessories = Accessory::factory()->count(3)->create();
 
-export default {
-  name: 'UserProfile',
-  
-  components: {
-    UserRoleBadge,
-  },
-  
-  props: {
-    user: {
-      type: Object,
-      required: true,
-      validator: (user) => {
-        return user.id && user.name && user.email;
-      },
-    },
-  },
-  
-  computed: {
-    isAdmin() {
-      return this.user.role === 'admin';
-    },
-  },
-};
-</script>
-```
+        $dto = new ProductDataTransferObject(
+            accessoryIds: $accessories->pluck('id')->toArray(),
+            // ... other required fields
+        );
 
-**Rules:**
+        $action = new SaveProductAccessories();
+        $action($product, $dto);
 
-- Single File Components (.vue)
-- PascalCase component names, kebab-case in templates
-- Always validate props with types and required flags
-- Single responsibility per component
-- Computed properties for derived state
-
-### Project Structure (Vue)
-
-```
-resources/js/
-├── components/           # By feature/domain
-│   ├── users/
-│   ├── posts/
-│   └── shared/
-├── services/            # API calls
-├── store/               # Vuex modules
-├── utils/               # Shared utilities
-└── constants/           # App constants
-```
-
-### Vuex Pattern
-
-```javascript
-// store/modules/users.js
-export default {
-  namespaced: true,
-  
-  state: {
-    users: [],
-    loading: false,
-    error: null,
-  },
-  
-  mutations: {
-    SET_USERS(state, users) {
-      state.users = users;
-    },
-    
-    SET_LOADING(state, loading) {
-      state.loading = loading;
-    },
-  },
-  
-  actions: {
-    async fetchUsers({ commit }) {
-      commit('SET_LOADING', true);
-      
-      try {
-        const users = await userService.getAll();
-        commit('SET_USERS', users);
-      } finally {
-        commit('SET_LOADING', false);
-      }
-    },
-  },
-  
-  getters: {
-    adminUsers: (state) => {
-      return state.users.filter(u => u.role === 'admin');
-    },
-  },
-};
-```
-
-### API Service Layer
-
-```javascript
-// services/userService.js
-import axios from 'axios';
-
-class UserService {
-  async getAll() {
-    const response = await axios.get('/api/users');
-    return response.data.data;
-  }
-  
-  async create(userData) {
-    const response = await axios.post('/api/users', userData);
-    return response.data.data;
-  }
-  
-  async update(id, userData) {
-    const response = await axios.patch(`/api/users/${id}`, userData);
-    return response.data.data;
-  }
+        $this->assertCount(3, $product->fresh()->accessories);
+    }
 }
-
-export default new UserService();
 ```
 
 ## Error Handling
@@ -520,13 +868,13 @@ namespace App\Exceptions;
 use Exception;
 use Illuminate\Http\JsonResponse;
 
-final class UserNotFoundException extends Exception
+final class ProductNotFoundException extends Exception
 {
     public function render(): JsonResponse
     {
         return response()->json([
-            'error' => 'User not found',
-            'message' => 'The requested user does not exist',
+            'error' => 'Product not found',
+            'message' => 'The requested product does not exist',
         ], 404);
     }
 }
@@ -535,16 +883,17 @@ final class UserNotFoundException extends Exception
 ### Frontend (Vue)
 
 ```javascript
-async createUser(userData) {
+async createProduct(productData) {
   try {
-    const user = await userService.create(userData);
-    this.$toast.success('User created successfully');
-    return user;
+    const product = await productService.create(productData);
+    this.$toast.success('Product created successfully');
+    return product;
   } catch (error) {
     if (error.response?.status === 422) {
+      // Validation errors
       this.$toast.error('Validation failed: ' + error.response.data.message);
     } else {
-      this.$toast.error('Failed to create user');
+      this.$toast.error('Failed to create product');
     }
     throw error;
   }
@@ -553,70 +902,42 @@ async createUser(userData) {
 
 **Error handling rules:**
 
-- Validate inputs early
+- Validate inputs early (Form Requests)
 - Structured error response formats
 - Clear, actionable error messages
 - Proper HTTP status codes
 
-## Database Patterns
+## Database & Performance
 
 ### Query Optimization
 
+Always use eager loading to prevent N+1 queries:
+
 ```php
 // Bad: N+1 queries
-$users = User::all();
-foreach ($users as $user) {
-    echo $user->posts->count();
+$products = Product::all();
+foreach ($products as $product) {
+    echo $product->categories->count();
 }
 
 // Good: Eager loading
-$users = User::withCount('posts')->get();
-foreach ($users as $user) {
-    echo $user->posts_count;
+$products = Product::withCount('categories')->get();
+foreach ($products as $product) {
+    echo $product->categories_count;
 }
+
+// Good: With relationships
+$products = Product::with('categories', 'variants')->get();
 ```
 
-### Repository Pattern
+### Performance Best Practices
 
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Repositories;
-
-use App\Models\User;
-use Illuminate\Database\Eloquent\Collection;
-
-/**
- * User repository for complex queries
- */
-final class UserRepository
-{
-    public function findActiveAdmins(): Collection
-    {
-        return User::query()
-            ->where('role', 'admin')
-            ->where('active', true)
-            ->with('posts')
-            ->get();
-    }
-
-    public function create(array $data): User
-    {
-        return User::create($data);
-    }
-}
-```
-
-## Performance
-
-- **OpCache**: Enable in production
-- **Query optimization**: Use eager loading, avoid N+1
-- **Caching**: Redis for sessions, query caching
-- **Route caching**: `sail artisan route:cache`
-- **Config caching**: `sail artisan config:cache`
-- **View caching**: Automatic in production
+- **OpCache:** Enable in production
+- **Query optimization:** Use eager loading, avoid N+1
+- **Caching:** Redis for sessions, query caching
+- **Route caching:** `sail artisan route:cache`
+- **Config caching:** `sail artisan config:cache`
+- **View caching:** Automatic in production
 
 ## Security
 
@@ -632,45 +953,74 @@ final class UserRepository
 
 Follow PSR-12 coding standard:
 
-- 4 spaces for indentation
-- Opening braces on same line for classes/methods
+- 4 spaces for indentation (not tabs)
+- Opening braces on same line for methods
 - One blank line after namespace declaration
 - Declare visibility for all properties/methods
-
-## Tools Integration
-
-### Use MCP for Database
-
-```bash
-# Instead of manual queries, use MySQL MCP
-"Check the users table schema and recent records"
-```
-
-### Use Context7 for Documentation
-
-```bash
-# Before using unfamiliar packages
-"Get documentation for Laravel Sanctum authentication"
-```
-
-### Sail Commands
-
-```bash
-./vendor/bin/sail artisan migrate
-./vendor/bin/sail artisan make:model User
-./vendor/bin/sail artisan test
-./vendor/bin/sail composer require package/name
-```
 
 ## Development Checklist
 
 Before marking work complete:
 
-- [ ] Strict types declared in all PHP files
+**Backend:**
+
+- [ ] `declare(strict_types=1)` in all NEW PHP files
 - [ ] PHPDoc blocks on classes and public methods
-- [ ] Type hints on all parameters and returns
-- [ ] Form requests for validation
-- [ ] Tests written for business logic
-- [ ] No N+1 queries
-- [ ] OpenSpec change archived
-- [ ] Superpowers verification passed
+- [ ] Type hints on all parameters and returns (new code)
+- [ ] Form Requests for validation
+- [ ] Actions for business logic (not bloated controllers)
+- [ ] No N+1 queries (use eager loading)
+- [ ] Events for side effects
+- [ ] Tests for business logic
+
+**Frontend (New Features):**
+
+- [ ] Props validated with types and required flags
+- [ ] API calls in service layer (not inline)
+- [ ] Shared state in Vuex (if applicable)
+- [ ] No direct axios calls in components
+- [ ] Mixins for shared logic
+
+**Both:**
+
+- [ ] No code repetition
+- [ ] Clear error messages
+- [ ] Tests passing (`sail artisan test`)
+
+## Summary: What Makes This Project Unique
+
+This Laravel + Vue 2 project differs from typical Laravel apps:
+
+**What's Different:**
+
+- Uses **Actions pattern** instead of Services/Repositories
+- Uses **ViewModels** for Blade view data preparation
+- Directory is `DataTransferObjects/` not `DTOs/`
+- No Vuex store (component-local state)
+- Inline axios calls (no service layer yet)
+- Event-driven architecture emphasized
+- ~5% strict typing adoption (aspirational goal for new code)
+
+**What Works Well:**
+
+- Form Requests (29 files)
+- API Resources (53 files)
+- DTOs with PHP 8.1 constructor property promotion
+- Feature test coverage (50 files)
+- Event-driven architecture
+- Vue mixins (7 files)
+
+**What Needs Improvement:**
+
+- Large controllers (ManualOrderController = 1,776 lines)
+- Inconsistent type safety in legacy code
+- Missing frontend service layer
+- Minimal unit test coverage
+- Missing prop validation in Vue components
+
+**Path Forward:**
+
+- NEW code follows strict standards
+- LEGACY code improved opportunistically
+- GRADUALLY introduce frontend best practices (services, Vuex)
+- REFACTOR large controllers into Actions
