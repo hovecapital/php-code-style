@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/hovecapital/php-code-style/compare/v1.0.1...v1.0.2) (2025-11-04)
+
+
+### Bug Fixes
+
+* formatting for permissions ([b380015](https://github.com/hovecapital/php-code-style/commit/b380015b5fe6eea71b81225f18c30d478549c726))
+
 ## [1.0.1](https://github.com/hovecapital/php-code-style/compare/v1.0.0...v1.0.1) (2025-11-03)
 
 
